@@ -1,0 +1,165 @@
+package com.example.hlfclient;
+
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.hyperledger.fabric.gateway.Contract;
+import org.hyperledger.fabric.gateway.ContractException;
+import org.hyperledger.fabric.gateway.Gateway;
+import org.hyperledger.fabric.gateway.Network;
+import org.hyperledger.fabric.gateway.Wallet;
+import org.hyperledger.fabric.gateway.Wallet.Identity;
+import org.hyperledger.fabric.gateway.impl.WalletIdentity;
+import org.hyperledger.fabric.sdk.Enrollment;
+import org.hyperledger.fabric.sdk.NetworkConfig;
+import org.hyperledger.fabric.sdk.NetworkConfig.OrgInfo;
+import org.hyperledger.fabric.sdk.security.CryptoSuite;
+import org.hyperledger.fabric_ca.sdk.HFCAClient;
+import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
+//import org.hyperledger.fabric.gateway.Wallets;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import com.owlike.genson.Genson;
+
+//import com.owlike.genson.Genson;
+
+import io.netty.handler.timeout.TimeoutException;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+
+
+@SpringBootApplication
+@EnableSwagger2
+public class OcioHlfDxcClientApplication_With_GatewaySDK {
+
+	public static void main(String[] args) throws Exception {
+		SpringApplication.run(OcioHlfDxcClientApplication_With_GatewaySDK.class, args);
+		
+		// Fabric Gateway code
+		NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File("/home/osboxes/OCIO-HLF-DXC-Client/network-config-tls.yaml"));
+		
+		OrgInfo clientOrg = networkConfig.getClientOrganization();
+		NetworkConfig.CAInfo clientOrgCAInfo = clientOrg.getCertificateAuthorities().get(0);
+		
+		HFCAClient hfcaClient = HFCAClient.createNewInstance(clientOrgCAInfo.getCAName(), clientOrgCAInfo.getUrl(), clientOrgCAInfo.getProperties());
+		
+		CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+		hfcaClient.setCryptoSuite(cryptoSuite);
+		
+		/*
+		NetworkConfig.UserInfo adminUserContext = clientOrg.getPeerAdmin();
+		System.out.println("adminUserContext.getAccount(): " + adminUserContext.getAccount());
+		System.out.println("adminUserContext.getName(): " + adminUserContext.getName());
+		System.out.println("adminUserContext.getMspId(): " + adminUserContext.getMspId());
+		System.out.println("adminUserContext.getAffiliation(): " + adminUserContext.getAffiliation());
+		*/
+		
+		// getting Client Org CA Registrars info (admin info)
+		NetworkConfig.UserInfo registrarInfo = clientOrg.getCertificateAuthorities().get(0).getRegistrars().iterator().next();
+//		System.out.println("registrarInfo.getAccount(): " + registrarInfo.getAccount()); // somehow it is null
+//		System.out.println("registrarInfo.getName(): " + registrarInfo.getName()); // admin
+//		System.out.println("registrarInfo.getMspId(): " + registrarInfo.getMspId());
+//		System.out.println("registrarInfo.getAffiliation(): " + registrarInfo.getAffiliation()); // somehow it is null, though it is set in network-config yaml file
+//		System.out.println("registrarInfo.getEnrollSecret(): " + registrarInfo.getEnrollSecret()); // adminpw
+		//System.out.println("registrarInfo.getEnrollment(): " + registrarInfo.getEnrollment().getCert()); // here, NullPointerException
+		String afficiation = "org1.department1";
+		registrarInfo.setAffiliation("org1.department1");
+		Enrollment adminEnrollment = hfcaClient.enroll(registrarInfo.getName(), registrarInfo.getEnrollSecret()); //pass admin username and password
+		registrarInfo.setEnrollment(adminEnrollment);
+//		System.out.println("registrarInfo.getEnrollment(): " + registrarInfo.getEnrollment().getCert()); // now, it is fine
+		
+		UserContext user1 = new UserContext();
+		Date date = new Date();
+	    //This method returns the time in millis
+	    long currentTimeInMilliSecs = date.getTime();
+	    //System.out.println("Time in milliseconds using Date class: " + currentTimeInMilliSecs);
+	    String uniqueUserName = "User" + currentTimeInMilliSecs;
+	    //System.out.println("uniqueUserName: " + uniqueUserName);
+		user1.setName(uniqueUserName);
+		user1.setMspId(clientOrg.getMspId());
+		user1.setAffiliation(afficiation);
+		Set<String> roles = new HashSet<String>();
+		roles.add("client");
+		user1.setRoles(roles);
+		
+		RegistrationRequest rr = new RegistrationRequest(user1.getName(), user1.getAffiliation());
+		String enrollmentSecret = hfcaClient.register(rr, registrarInfo);
+		//user1.setEnrollSecret(enrollmentSecret);
+
+		Enrollment userEnrollment = hfcaClient.enroll(user1.getName(), enrollmentSecret);
+		user1.setEnrollment(userEnrollment);
+		// Load an existing wallet holding identities used to access the network.
+		// First get the User Identity info that will be used to trigger transaction
+		System.out.println("Kalyan: Gateway code starting...");
+		//Path certificatePem = Paths.get("/home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/signcerts", "User1@org1.example.com-cert.pem");
+		//Path privateKey = Paths.get("/home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/keystore", "37f9fed6f207724c7b56f9089e30337edabff8abcdf00a348306152dc5fd5a6a_sk");
+		Path walletsDir = Paths.get("wallet");
+		Wallet userWallet = Wallet.createFileSystemWallet(walletsDir);
+		//userWallet.put("Org1User2", Wallet.Identity.createIdentity("Org1MSP", Files.newBufferedReader(certificatePem), Files.newBufferedReader(privateKey)));
+		// just cross verify whether we are able to get user info from wallet
+		//Wallet.Identity userIdentity = userWallet.get("Org1User2");
+		//System.out.println("userIdentity.getMspId(): " + userIdentity.getMspId());
+		Identity identity1 = new WalletIdentity("Org1MSP", userEnrollment.getCert(), userEnrollment.getKey());
+		userWallet.put("user1", identity1);
+		System.out.println("Kalyan: Wallets code done...");
+        //Path walletDirectory = Paths.get("wallet");
+       // Wallet wallet = Wallets.newFileSystemWallet(walletDirectory);
+        
+               // Path to a common connection profile describing the network.
+        Path networkConfigFile = Paths.get("/home/osboxes/OCIO-HLF-DXC-Client/network-config-tls.yaml");
+
+        // Configure the gateway connection used to access the network.
+        Gateway.Builder builder = Gateway.createBuilder()
+                .identity(userWallet, "user1")
+                .networkConfig(networkConfigFile);
+
+        // Create a gateway connection
+        //try (Gateway gateway = builder.discovery(true).connect()) {
+        try (Gateway gateway = builder.connect()) {
+        	System.out.println("Kalyan: In connection try block starting...");
+
+            // Obtain a smart contract deployed on the network.
+            Network network = gateway.getNetwork("mychannel");
+            System.out.println("Kalyan: After getting network...");
+            Contract contract = network.getContract("fabcarcc");
+
+            System.out.println("Kalyan: After getting contract...");
+            // Submit transactions that store state to the ledger.
+            byte[] createCarResult;
+			try {
+				createCarResult = contract.createTransaction("createCar")
+				        .submit("CAR101", "VW", "Polo", "Grey", "Mary");
+				System.out.println("Kalyan: createCarResult: " + new String(createCarResult, StandardCharsets.UTF_8));
+			} catch (java.util.concurrent.TimeoutException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}            
+
+            // Evaluate transactions that query state from the ledger.
+			System.out.println("Kalyan: Before queryAllCars...");
+            byte[] queryAllCarsResult = contract.evaluateTransaction("queryAllCars");
+            System.out.println("Kalyan: createCarResult: " + new String(queryAllCarsResult, StandardCharsets.UTF_8));
+            
+//            byte[] carInfo = contract.createTransaction("queryCar").submit("CAR100");
+//            Genson genson = new Genson();            
+//            Car car = genson.deserialize(carInfo.toString(), Car.class);
+//            System.out.println("Kalyan: car.getColor()" + car.getColor());
+
+        } catch (ContractException | TimeoutException | InterruptedException e) {
+            e.printStackTrace();
+        }
+	} // main function end
+	
+
+//	// Swagger Bean function
+//	@Bean
+//    public Docket SwaggerBeanAPI1() {
+//            return new Docket(DocumentationType.SWAGGER_2).select()
+//                    .apis(RequestHandlerSelectors.basePackage("com.example.OcioHlfDxcClientApplication_With_GatewaySDK")).build();
+//    }
+}

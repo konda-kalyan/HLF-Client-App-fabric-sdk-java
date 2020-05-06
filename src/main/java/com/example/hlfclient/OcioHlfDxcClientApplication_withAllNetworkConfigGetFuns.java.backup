@@ -1,0 +1,406 @@
+package com.example.hlfclient;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+
+import org.hyperledger.fabric.sdk.ChaincodeID;
+import org.hyperledger.fabric.sdk.Channel;
+import org.hyperledger.fabric.sdk.Enrollment;
+import org.hyperledger.fabric.sdk.EventHub;
+import org.hyperledger.fabric.sdk.HFClient;
+import org.hyperledger.fabric.sdk.NetworkConfig;
+import org.hyperledger.fabric.sdk.NetworkConfig.OrgInfo;
+import org.hyperledger.fabric.sdk.Orderer;
+import org.hyperledger.fabric.sdk.Peer;
+import org.hyperledger.fabric.sdk.ProposalResponse;
+import org.hyperledger.fabric.sdk.QueryByChaincodeRequest;
+import org.hyperledger.fabric.sdk.TransactionProposalRequest;
+import org.hyperledger.fabric.sdk.security.CryptoSuite;
+import org.hyperledger.fabric_ca.sdk.HFCAClient;
+import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
+//import org.hyperledger.fabric_ca.sdk.helper.Util;
+//import org.hyperledger.fabric.gateway.Wallets;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+
+@SpringBootApplication
+@EnableSwagger2
+public class OcioHlfDxcClientApplication_withAllNetworkConfigGetFuns {
+
+	public static void main(String[] args) throws Exception {
+		SpringApplication.run(OcioHlfDxcClientApplication_withAllNetworkConfigGetFuns.class, args);
+		
+		NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File("./network-config-tls.yaml"));
+		
+		// Channels info
+		System.out.println("\n------ Channel info starts -----\n");
+		Set<String> channelNames = networkConfig.getChannelNames();
+		for(String channelName : channelNames){
+				System.out.println("Channel Name: " + channelName);
+		}
+		
+		// Client Org info
+		System.out.println("\n------ Client Org info starts -----\n");
+		OrgInfo clientOrg = networkConfig.getClientOrganization();
+		System.out.println("clientOrg.getMspId(): " + clientOrg.getMspId());
+		System.out.println("clientOrg.getName(): " + clientOrg.getName());
+		System.out.println("clientOrg.getPeerAdmin().getName(): " + clientOrg.getPeerAdmin().getName());
+		System.out.println("clientOrg.getPeerAdmin().getEnrollment().getCert(): " + clientOrg.getPeerAdmin().getEnrollment().getCert());
+		System.out.println("clientOrg.getPeerAdmin().getEnrollment().getKey(): " + clientOrg.getPeerAdmin().getEnrollment().getKey());		
+		List<String> peerNames = clientOrg.getPeerNames();
+		for(String peerName : peerNames) {
+			System.out.println("clientOrg peerName: " + peerName);
+			//System.out.println("getPeerUrl(): " + networkConfig.getPeerUrl(peerName)); // this method introduced only in 2.0
+			Properties peerProperties = networkConfig.getPeerProperties(peerName);
+			Set<String> peerPropertiesNames =  peerProperties.stringPropertyNames();
+			for(String peerPropertiesName : peerPropertiesNames) {
+				System.out.println(peerName + " peerPropertiesName: " + peerPropertiesName + ", and value: " + peerProperties.getProperty(peerPropertiesName));
+			}
+			
+		}		
+		List<NetworkConfig.CAInfo> casInfo = clientOrg.getCertificateAuthorities();
+		for(NetworkConfig.CAInfo caInfo : casInfo) {
+			System.out.println("clientOrg ca_info.getName(): " + caInfo.getName());
+			System.out.println("clientOrg ca_info.getCAName(): " + caInfo.getCAName());
+			System.out.println("clientOrg ca_info.getUrl(): " + caInfo.getUrl());
+		}
+		
+		// Events Hubs info
+		System.out.println("\n------ Events Hubs info starts -----\n");
+		Collection<String> eventHubNames = networkConfig.getEventHubNames();
+		for(String eventHubName : eventHubNames) {
+			System.out.println("eventHubName: " + eventHubName);
+			Properties eventHubProperties = networkConfig.getEventHubsProperties(eventHubName);
+			Set<String> eventHubPropertiesNames =  eventHubProperties.stringPropertyNames();
+			for(String eventHubPropertiesName : eventHubPropertiesNames) {
+				System.out.println(eventHubName + " eventHubPropertiesName: " + eventHubPropertiesName + ", and value: " + eventHubProperties.getProperty(eventHubPropertiesName));
+			}
+		}
+		
+		// Orderers info
+		System.out.println("\n------ Orderer info starts -----\n");
+		Collection<String> orderersNames = networkConfig.getOrdererNames();
+		for(String ordererName : orderersNames) {
+			System.out.println("ordererName: " + ordererName);
+			Properties ordererProperties = networkConfig.getOrdererProperties(ordererName);
+			Set<String> ordererPropertiesNames =  ordererProperties.stringPropertyNames();
+			for(String ordererPropertiesName : ordererPropertiesNames) {
+				System.out.println(ordererName + " ordererPropertyName: " + ordererPropertiesName + ", and value: " + ordererProperties.getProperty(ordererPropertiesName));
+			}
+		}
+		
+		// All Orgs info
+		System.out.println("\n------ All Orgs info starts -----\n");
+		Collection<NetworkConfig.OrgInfo> allOrgsInfo = networkConfig.getOrganizationInfos();
+		String orgName = null;
+		for(NetworkConfig.OrgInfo orgInfo : allOrgsInfo) {
+			System.out.println("orgInfo.getName(): " + orgInfo.getName());
+			System.out.println("orgInfo.getMspId(): " + orgInfo.getMspId());
+			orgName = orgInfo.getName();
+		}
+		NetworkConfig.OrgInfo aOrgInfo = networkConfig.getOrganizationInfo(orgName);
+		System.out.println("aOrgInfo.getMspId(): " + aOrgInfo.getMspId());
+		
+		System.out.println("\n\n------ End of main() ---------");	
+		
+		
+		
+		/* ------------------ OUTPUT
+		 
+		 ------ Channel info starts -----
+		
+		Channel Name: mychannel
+		
+		------ Client Org info starts -----
+		
+		clientOrg.getMspId(): Org1MSP
+		clientOrg.getName(): Org1
+		clientOrg.getPeerAdmin().getName(): PeerAdmin_Org1MSP_Org1
+		clientOrg.getPeerAdmin().getEnrollment().getCert(): -----BEGIN CERTIFICATE-----
+		MIICKTCCAdCgAwIBAgIRAJEC5hmD46KMEo/JeoBr94EwCgYIKoZIzj0EAwIwczEL
+		MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+		cmFuY2lzY28xGTAXBgNVBAoTEG9yZzEuZXhhbXBsZS5jb20xHDAaBgNVBAMTE2Nh
+		Lm9yZzEuZXhhbXBsZS5jb20wHhcNMjAwMjE3MTcwNDAwWhcNMzAwMjE0MTcwNDAw
+		WjBrMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMN
+		U2FuIEZyYW5jaXNjbzEOMAwGA1UECxMFYWRtaW4xHzAdBgNVBAMMFkFkbWluQG9y
+		ZzEuZXhhbXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAReErrNidMk
+		mNDZCPyefMa8JR6gFNtHfJL3N6gfkRzn61To1LPpGSkEQ2Y6/3lkNzHD7oWiyRIa
+		JWYlrKDR4br3o00wSzAOBgNVHQ8BAf8EBAMCB4AwDAYDVR0TAQH/BAIwADArBgNV
+		HSMEJDAigCDVjkJAd6fVyLGe2ukEQW5NpUhgCSAgHbQvuGu6X/S9mjAKBggqhkjO
+		PQQDAgNHADBEAiA9+fUs3YI3iCovUb//n5CvqhbFq1i/aLGPN0OxFkUm/gIgDovo
+		rVU1kcAF+f924sgMGyQ1Lxr75mRVWFZnz6ACnoA=
+		-----END CERTIFICATE-----
+		
+		clientOrg.getPeerAdmin().getEnrollment().getKey(): sun.security.ec.ECPrivateKeyImpl@ffff7dec
+		clientOrg peerName: peer0.org1.example.com
+		peer0.org1.example.com peerPropertiesName: ssl-target-name-override, and value: peer0.org1.example.com
+		peer0.org1.example.com peerPropertiesName: pemFile, and value: /home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+		peer0.org1.example.com peerPropertiesName: negotiationType, and value: TLS
+		peer0.org1.example.com peerPropertiesName: sslProvider, and value: openSSL
+		peer0.org1.example.com peerPropertiesName: grpc.http2.keepalive_time, and value: 15
+		peer0.org1.example.com peerPropertiesName: hostnameOverride, and value: peer0.org1.example.com
+		peer0.org1.example.com peerPropertiesName: org.hyperledger.fabric.sdk.peer.organization_mspid, and value: Org1MSP
+		clientOrg peerName: peer1.org1.example.com
+		peer1.org1.example.com peerPropertiesName: ssl-target-name-override, and value: peer1.org1.example.com
+		peer1.org1.example.com peerPropertiesName: pemFile, and value: /home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls/ca.crt
+		peer1.org1.example.com peerPropertiesName: negotiationType, and value: TLS
+		peer1.org1.example.com peerPropertiesName: sslProvider, and value: openSSL
+		peer1.org1.example.com peerPropertiesName: grpc.http2.keepalive_time, and value: 15
+		peer1.org1.example.com peerPropertiesName: hostnameOverride, and value: peer1.org1.example.com
+		peer1.org1.example.com peerPropertiesName: org.hyperledger.fabric.sdk.peer.organization_mspid, and value: Org1MSP
+		clientOrg ca_info.getName(): ca-org1
+		clientOrg ca_info.getCAName(): ca-org1
+		clientOrg ca_info.getUrl(): https://localhost:7054
+		
+		------ Events Hubs info starts -----
+		
+		eventHubName: peer0.org2.example.com
+		peer0.org2.example.com eventHubPropertiesName: ssl-target-name-override, and value: peer0.org2.example.com
+		peer0.org2.example.com eventHubPropertiesName: pemFile, and value: /home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/server.crt
+		peer0.org2.example.com eventHubPropertiesName: negotiationType, and value: TLS
+		peer0.org2.example.com eventHubPropertiesName: sslProvider, and value: openSSL
+		peer0.org2.example.com eventHubPropertiesName: hostnameOverride, and value: peer0.org2.example.com
+		eventHubName: peer1.org2.example.com
+		peer1.org2.example.com eventHubPropertiesName: ssl-target-name-override, and value: peer1.org2.example.com
+		peer1.org2.example.com eventHubPropertiesName: pemFile, and value: /home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls/server.crt
+		peer1.org2.example.com eventHubPropertiesName: negotiationType, and value: TLS
+		peer1.org2.example.com eventHubPropertiesName: sslProvider, and value: openSSL
+		peer1.org2.example.com eventHubPropertiesName: hostnameOverride, and value: peer1.org2.example.com
+		eventHubName: peer0.org1.example.com
+		peer0.org1.example.com eventHubPropertiesName: ssl-target-name-override, and value: peer0.org1.example.com
+		peer0.org1.example.com eventHubPropertiesName: pemFile, and value: /home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+		peer0.org1.example.com eventHubPropertiesName: grpc.http2.keepalive_time, and value: 15
+		peer0.org1.example.com eventHubPropertiesName: hostnameOverride, and value: peer0.org1.example.com
+		eventHubName: peer1.org1.example.com
+		peer1.org1.example.com eventHubPropertiesName: ssl-target-name-override, and value: peer1.org1.example.com
+		peer1.org1.example.com eventHubPropertiesName: pemFile, and value: /home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls/ca.crt
+		peer1.org1.example.com eventHubPropertiesName: negotiationType, and value: TLS
+		peer1.org1.example.com eventHubPropertiesName: sslProvider, and value: openSSL
+		peer1.org1.example.com eventHubPropertiesName: grpc.http2.keepalive_time, and value: 15
+		peer1.org1.example.com eventHubPropertiesName: hostnameOverride, and value: peer1.org1.example.com
+		
+		------ Orderer info starts -----
+		
+		ordererName: orderer.example.com
+		orderer.example.com ordererPropertyName: grpc-max-send-message-length, and value: 15
+		orderer.example.com ordererPropertyName: pemFile, and value: /home/osboxes/fabric-samples/first-network/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+		orderer.example.com ordererPropertyName: hostnameOverride, and value: orderer.example.com
+		
+		------ All Orgs info starts -----
+		
+		orgInfo.getName(): Org1
+		orgInfo.getMspId(): Org1MSP
+		orgInfo.getName(): Org2
+		orgInfo.getMspId(): Org2MSP
+		aOrgInfo.getMspId(): Org2MSP
+		
+		
+		------ End of main() ---------
+	 */
+		
+	} // main ends here
+	
+	
+	
+	
+	
+	
+	public void waste() throws Exception {
+		
+		// Fabric Gateway code
+		String caUrl = "https://localhost:7054"; // ensure that port is of CA
+		String caName = "ca-org1";
+		//String ca_pemStr = "-----BEGIN CERTIFICATE-----\nMIICUjCCAfigAwIBAgIRALGn0YCp2GJiWLT7r6FLVckwCgYIKoZIzj0EAwIwczEL\nMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG\ncmFuY2lzY28xGTAXBgNVBAoTEG9yZzEuZXhhbXBsZS5jb20xHDAaBgNVBAMTE2Nh\nLm9yZzEuZXhhbXBsZS5jb20wHhcNMjAwMjEzMTAwMDAwWhcNMzAwMjEwMTAwMDAw\nWjBzMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMN\nU2FuIEZyYW5jaXNjbzEZMBcGA1UEChMQb3JnMS5leGFtcGxlLmNvbTEcMBoGA1UE\nAxMTY2Eub3JnMS5leGFtcGxlLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IA\nBIrnhWWG1aXisvYskKPfGfR/nG9HeODZIyEY538K9Ecnr3hDSYN1m+cuIfw2ZLx/\n40sAqOiJBoT30cKyzSfJ5yKjbTBrMA4GA1UdDwEB/wQEAwIBpjAdBgNVHSUEFjAU\nBggrBgEFBQcDAgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUwAwEB/zApBgNVHQ4EIgQg\nq5zej6VcG1xug3SINSt7smeL9i0ClmF9ki++zwKPedgwCgYIKoZIzj0EAwIDSAAw\nRQIhAIdzg5dTGjmzKergR+EgpBe9k+Dtsn74mTLzzI1ASmZqAiBFlJA+9xny4wyQ\nLQZ+xyBuCeWl8tfCROclrUPlBegnww==\n-----END CERTIFICATE-----\n";
+		// ~/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
+		//String ca_pemStr = "-----BEGIN CERTIFICATE-----\nMIICUjCCAfigAwIBAgIRAIxBLSaTCsMusIZffZVzqtQwCgYIKoZIzj0EAwIwczEL\nMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG\ncmFuY2lzY28xGTAXBgNVBAoTEG9yZzEuZXhhbXBsZS5jb20xHDAaBgNVBAMTE2Nh\nLm9yZzEuZXhhbXBsZS5jb20wHhcNMjAwMjEzMTEzMTAwWhcNMzAwMjEwMTEzMTAw\nWjBzMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMN\nU2FuIEZyYW5jaXNjbzEZMBcGA1UEChMQb3JnMS5leGFtcGxlLmNvbTEcMBoGA1UE\nAxMTY2Eub3JnMS5leGFtcGxlLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IA\nBNK4GfbR3bws4V2sh7aqLC6kxsMSUaWfN66AV32U9q3iNvF1MT9qdGnDOupN711V\nK0gs3lFn3QCwcXreXpS+0eqjbTBrMA4GA1UdDwEB/wQEAwIBpjAdBgNVHSUEFjAU\nBggrBgEFBQcDAgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUwAwEB/zApBgNVHQ4EIgQg\nSRVWYbU2BUflr6WbaSWeBGs8v4KlrvjSWcHqR/gWeY4wCgYIKoZIzj0EAwIDSAAw\nRQIhAJnd6uqYKaTvCSeNCWadQBgM8XAqiP7X1TrMkKCE5jveAiAyQmTBF4gYss12\ndmfb6bbVfANmvqXiFha0rLrQHvmoNw==\n-----END CERTIFICATE-----\n";
+	
+	// ~/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem	
+	//String ca_pemStr = "-----BEGIN CERTIFICATE-----\nMIICVjCCAf2gAwIBAgIQFH2upqLGTJt6lJEOsuyxujAKBggqhkjOPQQDAjB2MQsw\nCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy\nYW5jaXNjbzEZMBcGA1UEChMQb3JnMS5leGFtcGxlLmNvbTEfMB0GA1UEAxMWdGxz\nY2Eub3JnMS5leGFtcGxlLmNvbTAeFw0yMDAyMTMxMTMxMDBaFw0zMDAyMTAxMTMx\nMDBaMHYxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQH\nEw1TYW4gRnJhbmNpc2NvMRkwFwYDVQQKExBvcmcxLmV4YW1wbGUuY29tMR8wHQYD\nVQQDExZ0bHNjYS5vcmcxLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0D\nAQcDQgAEX9dqTHsw+rTznHbfY+p2u/i0ao9iyssWp7JMnNNxtIJ0t7lRGaoHwUPZ\nynW3jmo6WAMM5QyXQSIWZOjq37Pt16NtMGswDgYDVR0PAQH/BAQDAgGmMB0GA1Ud\nJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1Ud\nDgQiBCBMiaVMXr/INaBnxQDrvYvwKSH0gFT3XiVv+Bg0do0x3jAKBggqhkjOPQQD\nAgNHADBEAiBHhjPOEUco1jy6ptR/GlJhBl9ZRQaHp+/SmbjJwyz9FQIgHcleKa60\nKiuz2e0EGZreS9Arf/J5lCBNYD6Mn6+IOR0=\n-----END CERTIFICATE-----\n";
+	
+		String caCertFileName = "/home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem";
+		//String pemStr = "-----BEGIN CERTIFICATE-----\r\n****\r\n-----END CERTIFICATE-----\r\n";				
+	    File caCertFile = new File(caCertFileName);
+	    if (!caCertFile.exists() || !caCertFile.isFile()) {
+	        throw new RuntimeException("CA Cert is missing cert file: " + caCertFile.getAbsolutePath());
+	    }        
+	    Properties caProperties = new Properties();
+	    caProperties.setProperty("pemFile", caCertFile.getAbsolutePath());
+	    caProperties.setProperty("allowAllHostNames", "true");
+	    Path caPath = Paths.get(caCertFileName);        ;
+		caProperties.put("pemBytes", Files.readAllBytes(caPath));
+
+		//Properties ca_properties = new Properties();
+		//ca_properties.put("pemBytes", ca_pemStr.getBytes());
+
+		HFCAClient hfcaClient = HFCAClient.createNewInstance(caName, caUrl, caProperties);
+        		
+		CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+		hfcaClient.setCryptoSuite(cryptoSuite);
+		
+		UserContext adminUserContext = new UserContext();
+		adminUserContext.setName("admin"); // admin username
+		adminUserContext.setAffiliation("department1"); // affiliation
+		adminUserContext.setMspId("Org1MSP"); // org1 mspid
+		
+		Enrollment adminEnrollment = hfcaClient.enroll("admin", "adminpw"); //pass admin username and password
+		adminUserContext.setEnrollment(adminEnrollment);
+		
+		Util.writeUserContext(adminUserContext); // save admin context to local file system
+
+		UserContext userContext = new UserContext();
+		userContext.setName("user1");
+		userContext.setAffiliation("org1.department1");
+		userContext.setMspId("Org1MSP");
+
+		RegistrationRequest rr = new RegistrationRequest("user1", "org1.department1");
+		//String enrollmentSecret = hfcaClient.register(rr, adminUserContext);
+
+		//Enrollment enrollment = hfcaClient.enroll(userContext.getName(), enrollmentSecret);
+		//userContext.setEnrollment(enrollment);
+		//Util.writeUserContext(userContext);
+		
+		
+		//UserContext adminUserContext1 = Util.readUserContext("org1", "admin");
+		//CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+		HFClient hfClient = HFClient.createNewInstance();
+		hfClient.setCryptoSuite(cryptoSuite);
+		hfClient.setUserContext(adminUserContext);
+		
+		// Client properties (use admin user credentials)
+		String clientTLSCertFileName = "/home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/tls/client.crt";
+		String clientKeyFileName = "/home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/tls/client.key";
+		File clientCertFile = new File(clientTLSCertFileName);
+	    if (!clientCertFile.exists() || !clientCertFile.isFile()) {
+	        throw new RuntimeException("Client Cert is missing cert file: " + clientCertFile.getAbsolutePath());
+	    }
+	    File clientKeyFile = new File(clientKeyFileName);
+	    if (!clientKeyFile.exists() || !clientKeyFile.isFile()) {
+	        throw new RuntimeException("Client key is missing: " + caCertFile.getAbsolutePath());
+	    }
+		
+		String peer_name = "peer0.org1.example.com";
+		String peer_url = "grpcs://localhost:7051"; // Ensure that port is of peer1
+		//String peerTLSCertFileName = "crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem";
+		//String peerTLSCertFileName = "crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt";
+		String peerTLSCertFileName = "/home/osboxes/fabric-samples/first-network/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/server.crt";
+		//String peerTLSCertFileName = "crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/server.crt";
+			
+	    File peerCertFile = new File(peerTLSCertFileName);
+	    if (!peerCertFile.exists() || !peerCertFile.isFile()) {
+	        throw new RuntimeException("Peer Cert is missing cert file: " + peerCertFile.getAbsolutePath());
+	    }        
+	    Properties peerProperties = new Properties();
+	    peerProperties.setProperty("pemFile", peerCertFile.getAbsolutePath());
+	    peerProperties.setProperty("trustServerCertificate", "true");
+	    //peerProperties.setProperty("pemFile", peerTLSCertFileName);
+	    System.out.println("peerCertFile.getAbsolutePath(): " + peerCertFile.getAbsolutePath());
+	    peerProperties.setProperty("allowAllHostNames", "true");
+	    Path peerPath = Paths.get(peerTLSCertFileName);        ;
+	    peerProperties.put("pemBytes", Files.readAllBytes(peerPath));
+	    //peerProperties.put("pemBytes", peerPemStr.getBytes());
+	    //System.out.println("Peer pem string: " + peerPemStr);
+	    //peerProperties.setProperty("sslProvider", "JDK");
+	    peerProperties.setProperty("sslProvider", "openSSL");
+	    peerProperties.setProperty("negotiationType", "TLS");
+	    peerProperties.setProperty("clientCertFile", clientCertFile.getAbsolutePath());
+	    peerProperties.setProperty("clientKeyFile", clientKeyFile.getAbsolutePath());
+	    Path clientCertFilePath = Paths.get(clientTLSCertFileName);        ;
+	   	//peerProperties.put("clientCertBytes", Files.readAllBytes(clientCertFilePath));
+	   	Path clientKeyFilePath = Paths.get(clientKeyFileName);        ;
+	   	//peerProperties.put("clientKeyBytes", Files.readAllBytes(clientKeyFilePath));
+	    peerProperties.setProperty("org.hyperledger.fabric.sdk.peer.organization_mspid", "Org1MSP");
+	    //peerProperties.setProperty("negotiationType", "plainText");
+		
+		Peer peer = hfClient.newPeer(peer_name, peer_url, peerProperties);
+
+		 String event_url = "grpcs://localhost:7053"; // ensure that port is of event hub
+		 EventHub eventHub = hfClient.newEventHub(peer_name, event_url, peerProperties);
+
+		String orderer_name = "orderer.example.com";
+		 String orderer_url = "grpcs://localhost:7050"; // ensure that port is of orderer
+		 //String ordererTLSCertFileName = "crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem";
+		 String ordererTLSCertFileName = "/home/osboxes/fabric-samples/first-network/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt";
+			//String pemStr = "-----BEGIN CERTIFICATE-----\r\n****\r\n-----END CERTIFICATE-----\r\n";				
+	    File ordererCertFile = new File(ordererTLSCertFileName);
+	    if (!ordererCertFile.exists() || !ordererCertFile.isFile()) {
+	        throw new RuntimeException("Orderer Cert is missing cert file: " + ordererCertFile.getAbsolutePath());
+	    }
+		
+		 Properties orderer_properties = new Properties();
+		 orderer_properties.setProperty("pemFile", ordererCertFile.getAbsolutePath());
+		 orderer_properties.setProperty("trustServerCertificate", "true");
+		 //orderer_properties.setProperty("pemFile", ordererTLSCertFileName);
+		 orderer_properties.setProperty("allowAllHostNames", "true");
+		 Path ordererPath = Paths.get(peerTLSCertFileName);        ;
+		 orderer_properties.put("pemBytes", Files.readAllBytes(ordererPath));
+		 //orderer_properties.setProperty("sslProvider", "JDK");
+		 orderer_properties.setProperty("sslProvider", "openSSL");
+		 //orderer_properties.setProperty("negotiationType", "plainText");
+		 orderer_properties.setProperty("negotiationType", "TLS");
+		 orderer_properties.setProperty("oorg.hyperledger.fabric.sdk.orderer.organization_mspid", "OrdererMSP");
+		 orderer_properties.setProperty("clientCertFile", clientCertFile.getAbsolutePath());
+		 orderer_properties.setProperty("clientKeyFile", clientKeyFile.getAbsolutePath());
+		 //orderer_properties.put("clientCertBytes", Files.readAllBytes(clientCertFilePath));
+		 //orderer_properties.put("clientKeyBytes", Files.readAllBytes(clientKeyFilePath));
+		 
+		 Orderer orderer = hfClient.newOrderer(orderer_name, orderer_url, orderer_properties);
+		 
+		 Channel channel = hfClient.newChannel("mychannel");
+
+		 channel.addPeer(peer);
+		 channel.addEventHub(eventHub);
+		 channel.addOrderer(orderer);
+		 channel.initialize();
+		 
+		 TransactionProposalRequest request = hfClient.newTransactionProposalRequest();
+		 //String cc = "fabcarcc"; // Chaincode name
+		 String cc = "mycc"; // Chaincode name
+		 ChaincodeID ccid = ChaincodeID.newBuilder().setName(cc).build();
+
+		 request.setChaincodeID(ccid);
+		 //request.setFcn("initLedger"); // Chaincode invoke funtion name
+		 request.setFcn("query"); // Chaincode invoke funtion name
+		 //String[] arguments = { "CAR11", "VgW", "Poglo", "Ggrey", "Margy" }; // Arguments that Chaincode function takes
+		 String[] arguments = { "a" };  // Arguments that Chaincode function takes
+		 //request.setArgs(arguments);
+		 request.setProposalWaitTime(3000);
+		 Collection<ProposalResponse> responses = channel.sendTransactionProposal(request);
+		 for (ProposalResponse res : responses) {
+		   // Process response from transaction proposal
+		 }
+		
+		 //CompletableFuture<TransactionEvent> cf = channel.sendTransaction(responses);
+		 channel.sendTransaction(responses);
+		 
+		 QueryByChaincodeRequest queryRequest = hfClient.newQueryProposalRequest();
+		 queryRequest.setChaincodeID(ccid); // ChaincodeId object as created in Invoke block
+		 queryRequest.setFcn("queryCar"); // Chaincode function name for querying the blocks
+
+		 String[] arguments1 = { "Toyota"}; // Arguments that the above functions take
+		 if (arguments1 != null)
+		  queryRequest.setArgs(arguments1);
+
+		 // Query the chaincode  
+		 Collection<ProposalResponse> queryResponse = channel.queryByChaincode(queryRequest);
+
+		 for (ProposalResponse pres : queryResponse) {
+		  // process the response here
+		 }		 
+	} // main function end
+	
+
+//	// Swagger Bean function
+//	@Bean
+//    public Docket SwaggerBeanAPI() {
+//            return new Docket(DocumentationType.SWAGGER_2).select()
+//                    .apis(RequestHandlerSelectors.basePackage("com.example.OCIOHLFDXCClient")).build();
+//    }
+}
